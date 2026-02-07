@@ -1,0 +1,9 @@
+Flask
+easyocr
+SQLAlchemy
+Flask-SQLAlchemy
+opencv-python-headless
+numpy
+thefuzz
+python-Levenshtein
+Pillow
