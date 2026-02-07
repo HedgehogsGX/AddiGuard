@@ -1,6 +1,6 @@
 # AddiGuard
 
-AddiGuard is a project designed to...
+AddiGuard is a project designed to...maby later when tne project is finished
 
 ## Project Structure
 
