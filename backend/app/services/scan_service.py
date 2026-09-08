@@ -160,29 +160,47 @@ class ScanService:
         for result in results:
             if not isinstance(result, dict) or not isinstance(result.get("name"), str) or not result["name"].strip():
                 raise ScanError("Vision provider returned invalid analysis data.", 502)
+            name = result["name"].strip()
             score = result.get("risk_score")
             traffic = result.get("traffic_light")
-            if score is not None and (isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score) or not 0 <= score <= 1):
-                raise ScanError("Vision provider returned invalid analysis data.", 502)
-            if traffic is not None and (not isinstance(traffic, str) or traffic not in TRAFFIC_LIGHTS):
-                raise ScanError("Vision provider returned invalid analysis data.", 502)
-            if (score is None) != (traffic is None) or (score is not None and not cls._traffic_matches(score, traffic)):
-                raise ScanError("Vision provider returned contradictory risk data.", 502)
+            if not cls._is_risk_pair(score, traffic):
+                logger.warning("Discarding inconsistent risk fields for one additive.")
+                score = traffic = None
             details = result.get("details")
-            if not isinstance(details, dict) or not isinstance(details.get("name"), str) or not details["name"].strip():
-                raise ScanError("Vision provider returned invalid analysis data.", 502)
-            clean_details = {"name": details["name"].strip()}
+            if not isinstance(details, dict):
+                details = {}
+            detail_name = details.get("name")
+            clean_details = {
+                "name": detail_name.strip() if isinstance(detail_name, str) and detail_name.strip() else name
+            }
             for field in DETAIL_FIELDS[1:]:
                 field_value = details.get(field)
-                if field_value is not None:
-                    if field.endswith("_level"):
-                        if isinstance(field_value, bool) or not isinstance(field_value, int) or not 1 <= field_value <= 10:
-                            raise ScanError("Vision provider returned invalid analysis data.", 502)
-                    elif not isinstance(field_value, str):
-                        raise ScanError("Vision provider returned invalid analysis data.", 502)
-                clean_details[field] = field_value
-            validated.append({"name": result["name"].strip(), "risk_score": score, "traffic_light": traffic, "details": clean_details})
+                if field.endswith("_level"):
+                    clean_details[field] = cls._level_or_none(field_value)
+                else:
+                    clean_details[field] = field_value if isinstance(field_value, str) and field_value.strip() else None
+                if field_value is not None and clean_details[field] is None:
+                    logger.warning("Discarding invalid %s for one additive.", field)
+            validated.append({"name": name, "risk_score": score, "traffic_light": traffic, "details": clean_details})
         return {"status": "success", "additives_found": len(validated), "results": validated}
+
+    @classmethod
+    def _is_risk_pair(cls, score: Any, traffic: Any) -> bool:
+        if score is None and traffic is None:
+            return True
+        if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score) or not 0 <= score <= 1:
+            return False
+        if not isinstance(traffic, str) or traffic not in TRAFFIC_LIGHTS:
+            return False
+        return cls._traffic_matches(score, traffic)
+
+    @staticmethod
+    def _level_or_none(value: Any) -> int | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        if not math.isfinite(value) or not float(value).is_integer() or not 1 <= value <= 10:
+            return None
+        return int(value)
 
     @staticmethod
     def _traffic_matches(score: float, traffic: str) -> bool:

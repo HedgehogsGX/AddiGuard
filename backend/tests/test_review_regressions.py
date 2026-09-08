@@ -24,12 +24,11 @@ class ApiContractTests(unittest.TestCase):
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
             return ScanService(FakeSession(content))
 
-    def test_empty_detail_names_are_rejected_by_backend(self):
+    def test_empty_detail_names_fall_back_to_the_additive_name(self):
         for name in ("", " \t\n"):
             with self.subTest(name=name):
-                with self.assertRaises(ScanError) as raised:
-                    self.service(name).analyze_image(image_bytes())
-                self.assertEqual(raised.exception.status_code, 502)
+                result = self.service(name).analyze_image(image_bytes())
+                self.assertEqual(result["results"][0]["details"]["name"], "provider ingredient")
 
     def test_detail_names_are_trimmed(self):
         result = self.service(" provider ingredient ").analyze_image(image_bytes())

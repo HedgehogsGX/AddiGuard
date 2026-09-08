@@ -81,15 +81,50 @@ class ScanServiceTests(unittest.TestCase):
             service.analyze_image(image_bytes())
         self.assertEqual(raised.exception.status_code, 422)
 
-    def test_invalid_schema_and_contradictory_risk_are_rejected(self):
+    def test_structurally_invalid_responses_are_rejected(self):
         for content in (
-            {"readable_label": True, "results": [{"name": "x", "risk_score": 2, "traffic_light": "Red", "details": {"name": "x"}}]},
-            {"readable_label": True, "results": [{"name": "x", "risk_score": None, "traffic_light": "Green", "details": {"name": "x"}}]},
-            {"readable_label": True, "results": [{"name": "x", "risk_score": 0.2, "traffic_light": [], "details": {"name": "x"}}]},
+            {"readable_label": "yes", "results": []},
+            {"readable_label": True, "results": {"name": "x"}},
+            {"readable_label": True, "results": [{"risk_score": None, "traffic_light": None, "details": {}}]},
+            {"readable_label": True, "results": [{"name": "  ", "risk_score": None, "traffic_light": None}]},
         ):
-            with self.assertRaises(ScanError) as raised:
-                self.service(content).analyze_image(image_bytes())
-            self.assertEqual(raised.exception.status_code, 502)
+            with self.subTest(content=content):
+                with self.assertRaises(ScanError) as raised:
+                    self.service(content).analyze_image(image_bytes())
+                self.assertEqual(raised.exception.status_code, 502)
+
+    def test_inconsistent_risk_fields_become_not_assessed(self):
+        for score, traffic in ((2, "Red"), (None, "Green"), (0.2, []), (0.75, "Yellow"), (True, "Green")):
+            with self.subTest(score=score, traffic=traffic):
+                content = {"readable_label": True, "results": [
+                    {"name": "x", "risk_score": score, "traffic_light": traffic, "details": {"name": "x"}},
+                ]}
+                result = self.service(content).analyze_image(image_bytes())["results"][0]
+                self.assertIsNone(result["risk_score"])
+                self.assertIsNone(result["traffic_light"])
+        content = {"readable_label": True, "results": [
+            {"name": "x", "risk_score": 0.7, "traffic_light": "Yellow", "details": {"name": "x"}},
+        ]}
+        result = self.service(content).analyze_image(image_bytes())["results"][0]
+        self.assertEqual((result["risk_score"], result["traffic_light"]), (0.7, "Yellow"))
+
+    def test_invalid_detail_fields_become_null_without_losing_the_scan(self):
+        content = {"readable_label": True, "results": [{
+            "name": "x", "risk_score": None, "traffic_light": None,
+            "details": {
+                "name": "x", "description": ["not", "text"], "health_risk": "   ", "usage_limit": 5,
+                "toxicity_level": 2.0, "exposure_level": 11, "sensitivity_level": 2.5, "cumulative_level": True,
+            },
+        }, {"name": "y", "risk_score": None, "traffic_light": None}]}
+        results = self.service(content).analyze_image(image_bytes())["results"]
+        self.assertEqual(len(results), 2)
+        details = results[0]["details"]
+        self.assertEqual(details["toxicity_level"], 2)
+        self.assertIsInstance(details["toxicity_level"], int)
+        for field in ("description", "health_risk", "usage_limit", "exposure_level", "sensitivity_level", "cumulative_level"):
+            self.assertIsNone(details[field], field)
+        self.assertEqual(results[1]["details"]["name"], "y")
+        self.assertIsNone(results[1]["details"]["description"])
 
     def test_bad_file_is_rejected_without_provider_call(self):
         with self.assertRaises(ScanError) as raised:

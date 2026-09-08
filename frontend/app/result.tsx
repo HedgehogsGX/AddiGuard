@@ -73,6 +73,9 @@ export default function ResultScreen() {
               ? `${results.length} additive${results.length === 1 ? "" : "s"} detected`
               : "No additives identified"}
           </Text>
+          <Text style={styles.caveat}>
+            AI-generated from the vision provider. Not medical advice.
+          </Text>
         </View>
         <View style={styles.listContainer}>
           {results.length === 0 ? (
@@ -190,6 +193,10 @@ export default function ResultScreen() {
                   label="Cumulative"
                   value={selectedItem.details.cumulative_level}
                 />
+                <Text style={styles.caveat}>
+                  These details are AI-generated from the vision provider and
+                  may be incomplete or wrong. They are not medical advice.
+                </Text>
               </ScrollView>
             )}
           </View>
@@ -232,6 +239,12 @@ const styles = StyleSheet.create({
   backButton: { position: "absolute", top: 20, left: 20, padding: 8 },
   headerTitle: { color: "#263238", fontSize: 24, fontWeight: "700" },
   headerSubtitle: { color: "#546E7A", marginTop: 8 },
+  caveat: {
+    color: "#78909C",
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 10,
+  },
   listContainer: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
   listContent: { paddingBottom: 40 },
   card: {
