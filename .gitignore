@@ -20,6 +20,9 @@ nosetests.xml
 coverage.xml
 *.cover
 *.log
+.env
+.env.*
+!.env.example
 .gitattributes
 .mypy_cache/
 .pytest_cache/

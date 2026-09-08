@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "build:web": "expo export --platform web"
   },
   "dependencies": {
     "axios": "^1.13.2",
@@ -16,6 +18,9 @@
     "expo-linking": "~8.0.11",
     "expo-router": "~6.0.21",
     "expo-status-bar": "~3.0.9",
+    "@expo/vector-icons": "^15.0.3",
+    "react-dom": "19.1.0",
+    "react-native-web": "^0.20.0",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-safe-area-context": "~5.6.0",
