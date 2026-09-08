@@ -23,8 +23,8 @@ python3 -m pip install -r backend/requirements.txt
 cp backend/.env.example backend/.env
 ```
 
-Set `OPENAI_API_KEY` in the environment (or load `backend/.env` with your preferred
-dotenv tool), then start the actual app:
+Put your provider key in `backend/.env` as `OPENAI_API_KEY` (the file is git-ignored and
+loaded by `run.py`), or export it in the environment, then start the app:
 
 ```sh
 cd backend

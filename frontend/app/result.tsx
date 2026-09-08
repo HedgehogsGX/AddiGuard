@@ -70,7 +70,7 @@ export default function ResultScreen() {
           <Text style={styles.headerTitle}>Analysis Report</Text>
           <Text style={styles.headerSubtitle}>
             {results.length
-              ? `${results.length} ingredient${results.length === 1 ? "" : "s"} detected`
+              ? `${results.length} additive${results.length === 1 ? "" : "s"} detected`
               : "No additives identified"}
           </Text>
         </View>

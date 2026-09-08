@@ -2,6 +2,7 @@
 
 import os
 import sqlite3
+from contextlib import closing
 
 
 DEFAULT_LEGACY_DB_PATH = os.path.abspath(
@@ -14,7 +15,7 @@ def cleanup_legacy_additives(db_path: str | None = None) -> bool:
     path = os.path.abspath(db_path or DEFAULT_LEGACY_DB_PATH)
     if not os.path.isfile(path):
         return False
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection:
         connection.execute("DROP TABLE IF EXISTS additives")
         connection.commit()
     return True
