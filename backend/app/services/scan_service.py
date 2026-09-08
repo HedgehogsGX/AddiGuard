@@ -3,6 +3,7 @@
 import base64
 import io
 import json
+import logging
 import math
 import os
 import re
@@ -14,6 +15,7 @@ from PIL.Image import DecompressionBombError
 
 
 ImageFile.LOAD_TRUNCATED_IMAGES = False
+logger = logging.getLogger(__name__)
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_PIXELS = 20_000_000
@@ -88,11 +90,14 @@ class ScanService:
                 timeout=self.timeout,
             )
         except requests.Timeout as exc:
+            logger.warning("Vision provider request timed out.")
             raise ScanError("Vision provider timed out. Please try again.", 504) from exc
         except requests.RequestException as exc:
+            logger.warning("Vision provider request failed (%s).", type(exc).__name__)
             raise ScanError("Vision provider is unavailable. Please try again.", 502) from exc
 
         if not 200 <= response.status_code < 300:
+            logger.warning("Vision provider returned HTTP %s.", response.status_code)
             raise ScanError("Vision provider returned an unavailable response.", 502)
         try:
             provider_response = response.json()
@@ -164,9 +169,9 @@ class ScanService:
             if (score is None) != (traffic is None) or (score is not None and not cls._traffic_matches(score, traffic)):
                 raise ScanError("Vision provider returned contradictory risk data.", 502)
             details = result.get("details")
-            if not isinstance(details, dict) or not isinstance(details.get("name"), str):
+            if not isinstance(details, dict) or not isinstance(details.get("name"), str) or not details["name"].strip():
                 raise ScanError("Vision provider returned invalid analysis data.", 502)
-            clean_details = {"name": details["name"]}
+            clean_details = {"name": details["name"].strip()}
             for field in DETAIL_FIELDS[1:]:
                 field_value = details.get(field)
                 if field_value is not None:

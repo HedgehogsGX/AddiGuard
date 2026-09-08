@@ -40,7 +40,7 @@ frontend or logged.
 ### iOS frontend
 
 Install the Expo dependencies and configure the API URL. The app is an Expo/React
-Native iOS app; web export is only a convenient verification target:
+Native iOS app:
 
 ```sh
 cd frontend
@@ -52,7 +52,13 @@ npm start         # open in Expo Go or an iOS development build
 Set `EXPO_PUBLIC_API_URL` to the reachable Flask URL, including `/api`. An iPhone
 cannot resolve the computer's `localhost`, so use the computer's LAN IP (for
 example `http://192.168.1.20:5000/api`) and ensure the Flask port is reachable on
-the same network. `npm run web` remains available for browser verification.
+the same network.
+
+The web build can verify rendering, but browser scanning requires the frontend and
+`/api` to share an origin through a reverse proxy. Flask does not enable cross-origin
+browser access: running Expo on `localhost:8081` and Flask on `localhost:5000`
+without a proxy will fail browser CORS checks. This restriction does not apply to
+the native iOS app.
 
 ## API contract and privacy
 
