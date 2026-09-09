@@ -1,9 +1,10 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { ScanResultProvider } from '../contexts/ScanResultContext';
 
 export default function Layout() {
   return (
-    <>
+    <ScanResultProvider>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
@@ -31,6 +32,6 @@ export default function Layout() {
           }} 
         />
       </Stack>
-    </>
+    </ScanResultProvider>
   );
 }

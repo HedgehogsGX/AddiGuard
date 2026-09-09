@@ -1,18 +1,24 @@
 import React, { useState, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Switch } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useRouter } from 'expo-router';
 import { analyzeImage } from '../services/api';
 import { MOCK_SCAN_RESULT } from '../services/mockData';
 import { ApiResponse } from '../types';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { frameToPhotoCrop, Rect } from '../utils/cropRect';
+import { useScanResult } from '../contexts/ScanResultContext';
 
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false);
   const [isMockMode, setIsMockMode] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+  const [cameraRect, setCameraRect] = useState<Rect>({ x: 0, y: 0, width: 0, height: 0 });
+  const [middleTop, setMiddleTop] = useState(0);
+  const [frame, setFrame] = useState<Rect>({ x: 0, y: 0, width: 0, height: 0 });
   const router = useRouter();
+  const { setResult } = useScanResult();
 
   if (!permission) {
     return (
@@ -44,15 +50,20 @@ export default function CameraScreen() {
         await new Promise(resolve => setTimeout(resolve, 1500));
         result = MOCK_SCAN_RESULT;
       } else {
-        const photo = await cameraRef.current?.takePictureAsync({ quality: 0.7 });
+        const photo = await cameraRef.current?.takePictureAsync({ quality: 1 });
         if (!photo?.uri) throw new Error('Could not capture a photo.');
-        result = await analyzeImage(photo.uri);
+        const crop = frameToPhotoCrop({ ...frame, x: frame.x + cameraRect.x, y: frame.y + middleTop + cameraRect.y }, cameraRect, { width: photo.width, height: photo.height });
+        const longSide = Math.max(crop.width, crop.height);
+        const resize = longSide > 1600 ? { [crop.width >= crop.height ? 'width' : 'height']: 1600 } : undefined;
+        const processed = await ImageManipulator.manipulateAsync(photo.uri, [
+          { crop: { originX: crop.x, originY: crop.y, width: crop.width, height: crop.height } },
+          ...(resize ? [{ resize }] : []),
+        ], { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG });
+        result = await analyzeImage(processed.uri);
       }
 
-      router.push({
-        pathname: '/result',
-        params: { data: JSON.stringify(result) }
-      });
+      setResult(result);
+      router.push('/result');
     } catch (error) {
       Alert.alert('Scan Failed', error instanceof Error ? error.message : 'Failed to capture or analyze image.');
     } finally {
@@ -66,8 +77,9 @@ export default function CameraScreen() {
         style={styles.camera} 
         facing="back"
         ref={cameraRef}
+        onLayout={({ nativeEvent }) => setCameraRect({ x: nativeEvent.layout.x, y: nativeEvent.layout.y, width: nativeEvent.layout.width, height: nativeEvent.layout.height })}
       >
-        <SafeAreaView style={styles.overlayContainer}>
+        <View style={styles.overlayContainer}>
           {__DEV__ && (
             <View style={styles.headerControls}>
               <View style={styles.mockToggleContainer}>
@@ -82,9 +94,10 @@ export default function CameraScreen() {
             </View>
           )}
 
-          <View style={styles.overlayMiddle}>
+          <View style={styles.overlayTop} />
+          <View style={styles.overlayMiddle} onLayout={({ nativeEvent }) => setMiddleTop(nativeEvent.layout.y)}>
             <View style={styles.overlaySide} />
-            <View style={styles.scanFrame}>
+            <View style={styles.scanFrame} onLayout={({ nativeEvent }) => setFrame(nativeEvent.layout)}>
               <View style={[styles.corner, styles.topLeft]} />
               <View style={[styles.corner, styles.topRight]} />
               <View style={[styles.corner, styles.bottomLeft]} />
@@ -106,7 +119,7 @@ export default function CameraScreen() {
             </TouchableOpacity>
             <Text style={styles.hintText}>Align ingredients within the frame</Text>
           </View>
-        </SafeAreaView>
+        </View>
       </CameraView>
     </View>
   );
@@ -172,15 +185,16 @@ const styles = StyleSheet.create({
   },
   scanFrame: {
     width: 300,
+    maxWidth: '80%',
     height: 250,
     borderColor: 'transparent', 
     position: 'relative',
   },
   overlayBottom: {
-    flex: 1.5,
+    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
-    paddingTop: 40,
+    justifyContent: 'center',
   },
   captureButton: {
     backgroundColor: '#4CAF50',

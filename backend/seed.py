@@ -12,6 +12,7 @@ def seed_database():
             # High Risk (Red)
             Additive(
                 name="Sodium Nitrite",
+                e_number="E250", aliases=["sodium nitrite"],
                 description="Preservative used in cured meats.",
                 toxicity_level=9,
                 exposure_level=8,
@@ -23,6 +24,7 @@ def seed_database():
             # Medium Risk (Yellow)
             Additive(
                 name="Sodium Benzoate",
+                e_number="E211", aliases=["sodium benzoate"],
                 description="Preservative in acidic foods.",
                 toxicity_level=6,
                 exposure_level=7,
@@ -34,6 +36,7 @@ def seed_database():
             # Low Risk (Green)
             Additive(
                 name="Vitamin C",
+                e_number="E300", aliases=["vitamin c", "ascorbic acid"],
                 description="Ascorbic Acid, antioxidant.",
                 toxicity_level=1,
                 exposure_level=1,
@@ -45,6 +48,7 @@ def seed_database():
             # Additional Dummy Data
             Additive(
                 name="Aspartame",
+                e_number="E951", aliases=["aspartame"],
                 description="Artificial sweetener.",
                 toxicity_level=5,
                 exposure_level=9,
@@ -55,6 +59,7 @@ def seed_database():
             ),
             Additive(
                 name="Monosodium Glutamate",
+                e_number="E621", aliases=["monosodium glutamate", "msg"],
                 description="Flavor enhancer (MSG).",
                 toxicity_level=4,
                 exposure_level=8,

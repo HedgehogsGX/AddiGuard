@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
+    "test": "tsc utils/cropRect.ts --target ES2020 --module commonjs --outDir .test-dist --skipLibCheck && node --test utils/cropRect.test.js",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -14,6 +15,7 @@
     "expo": "~54.0.30",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.12",
+    "expo-image-manipulator": "~14.0.8",
     "expo-linking": "~8.0.11",
     "expo-router": "~6.0.21",
     "expo-status-bar": "~3.0.9",
