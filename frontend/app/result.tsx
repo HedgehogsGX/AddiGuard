@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, FlatList, TouchableOpacity, Modal, ScrollView, Dimensions } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ApiResponse, ScanResult, TrafficLight } from '../types';
+import { Redirect, useRouter } from 'expo-router';
+import { ScanResult, TrafficLight } from '../types';
+import { useScanResult } from '../contexts/ScanResultContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,26 +12,19 @@ const TRAFFIC_LIGHT: Record<TrafficLight, { color: string; label: string }> = {
   Red: { color: '#E53935', label: 'HIGH RISK' },
   Yellow: { color: '#FFB300', label: 'MEDIUM RISK' },
   Green: { color: '#4CAF50', label: 'LOW RISK' },
+  Unrated: { color: '#757575', label: 'UNRATED' },
 };
 
 export default function ResultScreen() {
-  const params = useLocalSearchParams();
+  const { result: data } = useScanResult();
   const router = useRouter();
   const [selectedItem, setSelectedItem] = useState<ScanResult | null>(null);
   
-  let data: ApiResponse | null = null;
-  
-  try {
-    if (params.data) {
-      data = JSON.parse(params.data as string);
-    }
-  } catch (e) {
-    console.error("Failed to parse results", e);
-  }
+  if (!data) return <Redirect href="/" />;
 
-  const results = data?.results || [];
-  const totalRiskScore = data?.overall_risk_score ?? 0;
-  const overall = TRAFFIC_LIGHT[data?.overall_traffic_light ?? 'Green'];
+  const results = data.results;
+  const totalRiskScore = data.overall_risk_score;
+  const overall = TRAFFIC_LIGHT[data.overall_traffic_light];
 
   const renderItem = ({ item }: { item: ScanResult }) => {
     const isHighRisk = item.traffic_light === 'Red';
@@ -43,7 +37,7 @@ export default function ResultScreen() {
       >
         <View style={[styles.badgeContainer, { backgroundColor: TRAFFIC_LIGHT[item.traffic_light].color }]}>
            <Ionicons 
-            name={isHighRisk ? "warning" : "checkmark-circle"} 
+            name={item.traffic_light === 'Unrated' ? "information-circle" : isHighRisk ? "warning" : "checkmark-circle"}
             size={24} 
             color="white" 
           />
@@ -53,7 +47,8 @@ export default function ResultScreen() {
             <Text style={styles.additiveName}>{item.name}</Text>
             {isHighRisk && <Ionicons name="alert-circle" size={20} color="#E53935" />}
           </View>
-          <Text style={styles.riskScore}>Risk Level: {item.traffic_light}</Text>
+          <Text style={styles.riskScore}>{TRAFFIC_LIGHT[item.traffic_light].label}</Text>
+          <Text style={styles.description}>Read: {item.matched_text}</Text>
           <Text style={styles.description} numberOfLines={2}>{item.details.description}</Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color="#ccc" style={{ alignSelf: 'center' }} />
@@ -76,8 +71,8 @@ export default function ResultScreen() {
           <Text style={styles.headerTitle}>Analysis Report</Text>
           
           <View style={styles.scoreContainer}>
-            <Text style={styles.headerScore}>{totalRiskScore.toFixed(2)}</Text>
-            <Text style={styles.headerScoreLabel}>/ 1.0</Text>
+            <Text style={styles.headerScore}>{totalRiskScore === null ? '—' : totalRiskScore.toFixed(2)}</Text>
+            {totalRiskScore !== null && <Text style={styles.headerScoreLabel}>/ 1.0</Text>}
           </View>
           <Text style={styles.headerLabel}>{overall.label}</Text>
         </View>
@@ -128,41 +123,47 @@ export default function ResultScreen() {
                 <Text style={styles.modalTitle}>{selectedItem.name}</Text>
                 
                 <View style={[styles.riskBadge, { backgroundColor: TRAFFIC_LIGHT[selectedItem.traffic_light].color }]}>
-                  <Text style={styles.riskBadgeText}>{selectedItem.traffic_light} Risk</Text>
+                  <Text style={styles.riskBadgeText}>{TRAFFIC_LIGHT[selectedItem.traffic_light].label}</Text>
                 </View>
+
+                {selectedItem.traffic_light === 'Unrated' && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionText}>Detected, but no curated risk rating is available. This does not mean it is safe or unsafe. Unrated additives are excluded from the overall score.</Text>
+                  </View>
+                )}
 
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Description</Text>
-                  <Text style={styles.sectionText}>{selectedItem.details.description}</Text>
+                  <Text style={styles.sectionText}>{selectedItem.details.description || 'No description available.'}</Text>
                 </View>
 
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>⚠️ Health Impact</Text>
-                  <Text style={styles.sectionText}>{selectedItem.details.health_risk || 'No significant health risks reported.'}</Text>
+                  <Text style={styles.sectionText}>{selectedItem.details.health_risk || 'No curated health information available.'}</Text>
                 </View>
 
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>⚖️ Usage Limits</Text>
-                  <Text style={styles.sectionText}>{selectedItem.details.usage_limit || 'No specific limits.'}</Text>
+                  <Text style={styles.sectionText}>{selectedItem.details.usage_limit || 'No curated usage limit available.'}</Text>
                 </View>
 
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Risk Factors</Text>
                   <View style={styles.factorRow}>
                     <Text style={styles.factorLabel}>Toxicity:</Text>
-                    <Text style={styles.factorValue}>{selectedItem.details.toxicity_level}/10</Text>
+                    <Text style={styles.factorValue}>{selectedItem.details.toxicity_level === null ? 'Unrated' : `${selectedItem.details.toxicity_level}/10`}</Text>
                   </View>
                   <View style={styles.factorRow}>
                     <Text style={styles.factorLabel}>Exposure:</Text>
-                    <Text style={styles.factorValue}>{selectedItem.details.exposure_level}/10</Text>
+                    <Text style={styles.factorValue}>{selectedItem.details.exposure_level === null ? 'Unrated' : `${selectedItem.details.exposure_level}/10`}</Text>
                   </View>
                   <View style={styles.factorRow}>
                     <Text style={styles.factorLabel}>Sensitivity:</Text>
-                    <Text style={styles.factorValue}>{selectedItem.details.sensitivity_level}/10</Text>
+                    <Text style={styles.factorValue}>{selectedItem.details.sensitivity_level === null ? 'Unrated' : `${selectedItem.details.sensitivity_level}/10`}</Text>
                   </View>
                   <View style={styles.factorRow}>
                     <Text style={styles.factorLabel}>Cumulative effect:</Text>
-                    <Text style={styles.factorValue}>{selectedItem.details.cumulative_level}/10</Text>
+                    <Text style={styles.factorValue}>{selectedItem.details.cumulative_level === null ? 'Unrated' : `${selectedItem.details.cumulative_level}/10`}</Text>
                   </View>
                 </View>
               </ScrollView>

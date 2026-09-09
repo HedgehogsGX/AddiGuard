@@ -27,7 +27,8 @@ def scan_image():
         current_app.logger.exception("Image analysis failed")
         return jsonify({"error": "Image analysis failed"}), 500
 
-    overall_risk_score = max((r["risk_score"] for r in results), default=0)
+    rated_scores = [r["risk_score"] for r in results if r["risk_score"] is not None]
+    overall_risk_score = max(rated_scores) if rated_scores else (None if results else 0)
     return jsonify({
         "status": "success",
         "additives_found": len(results),

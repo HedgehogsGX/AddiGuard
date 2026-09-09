@@ -37,6 +37,7 @@ instance/
 
 # Node (in case any exist at root level)
 node_modules/
+frontend/.test-dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

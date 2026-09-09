@@ -11,13 +11,15 @@ class Additive(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), unique=True, nullable=False)
+    e_number = db.Column(db.String(16), unique=True, nullable=True)
+    aliases = db.Column(db.JSON, nullable=False, default=list)
     description = db.Column(db.Text, nullable=True)
     
     # Risk factors (1-10 scale)
-    toxicity_level = db.Column(db.Integer, default=1) # toxicity_score
-    exposure_level = db.Column(db.Integer, default=1) # exposure_risk
-    sensitivity_level = db.Column(db.Integer, default=1) # sensitivity
-    cumulative_level = db.Column(db.Integer, default=1) # cumulative_effect
+    toxicity_level = db.Column(db.Integer, nullable=True, default=None) # toxicity_score
+    exposure_level = db.Column(db.Integer, nullable=True, default=None) # exposure_risk
+    sensitivity_level = db.Column(db.Integer, nullable=True, default=None) # sensitivity
+    cumulative_level = db.Column(db.Integer, nullable=True, default=None) # cumulative_effect
     
     health_risk = db.Column(db.String(255), nullable=True) # Text description
     usage_limit = db.Column(db.String(255), nullable=True)
@@ -26,6 +28,8 @@ class Additive(db.Model):
         return {
             'id': self.id,
             'name': self.name,
+            'e_number': self.e_number,
+            'aliases': self.aliases or [],
             'description': self.description,
             'toxicity_level': self.toxicity_level,
             'exposure_level': self.exposure_level,
