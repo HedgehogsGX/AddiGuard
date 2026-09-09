@@ -1,7 +1,7 @@
 from io import BytesIO
 
 from flask import Blueprint, current_app, jsonify, request
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 
 from app.services.scan_service import ScanService
 
@@ -18,7 +18,7 @@ def scan_image():
     image_bytes = file.read()
     try:
         Image.open(BytesIO(image_bytes)).verify()
-    except (UnidentifiedImageError, OSError):
+    except Exception:
         return jsonify({"error": "Uploaded file is not a valid image"}), 400
 
     try:

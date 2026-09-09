@@ -1,3 +1,4 @@
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -36,8 +37,28 @@ def test_traffic_light_thresholds(score, expected):
 
 
 def test_reader_is_not_loaded_on_construction():
+    assert ScanService()._reader is None
+
+
+def test_reader_is_built_once_under_concurrent_first_access(monkeypatch):
+    import threading
+    import types
+
+    builds = []
+
+    class FakeReader:
+        def __init__(self, *args, **kwargs):
+            builds.append(threading.get_ident())
+
+    monkeypatch.setitem(sys.modules, "easyocr", types.SimpleNamespace(Reader=FakeReader))
     service = ScanService()
-    assert "reader" not in service.__dict__
+    threads = [threading.Thread(target=lambda: service.reader) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(builds) == 1
 
 
 def test_analyze_image_matches_additives_in_ocr_text(app, monkeypatch):
@@ -50,6 +71,13 @@ def test_analyze_image_matches_additives_in_ocr_text(app, monkeypatch):
     assert results[0]["risk_score"] == 0.83
     assert results[0]["traffic_light"] == "Red"
     assert results[0]["details"]["toxicity_level"] == 9
+
+
+def test_analyze_image_ignores_punctuation_and_case(app, monkeypatch):
+    service = ScanService()
+    monkeypatch.setattr(service, "extract_text", lambda _: ["Antioxidant:", "VITAMIN-C."])
+
+    assert [r["name"] for r in service.analyze_image(b"irrelevant")] == ["Vitamin C"]
 
 
 def test_analyze_image_tolerates_ocr_typos(app, monkeypatch):

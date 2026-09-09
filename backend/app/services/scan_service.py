@@ -1,6 +1,6 @@
 import re
+import threading
 from collections import defaultdict
-from functools import cached_property
 
 from flask import current_app
 from sqlalchemy import func, select
@@ -65,7 +65,12 @@ def match_additives(extracted_text, index):
             if occupied & span:
                 continue
             phrase = " ".join(tokens[start:start + width])
-            best_score, best_keys = 87, set()
+            # A lone word gets a stricter bar: one substitution in a word under twelve letters
+            # scores at most 90, which is exactly where everyday label words collide with
+            # additive names ("carbonated" vs "carbonates"). Multi-word phrases carry enough
+            # context to keep the looser threshold for OCR slips.
+            threshold = 91 if width == 1 else 88
+            best_score, best_keys = threshold - 1, set()
             for alias in fuzzy.get((width, phrase[0]), []):
                 if abs(len(alias) - len(phrase)) > max(1, len(alias) // 8):
                     continue
@@ -74,7 +79,7 @@ def match_additives(extracted_text, index):
                     best_score, best_keys = score, set(aliases[alias])
                 elif score == best_score:
                     best_keys.update(aliases[alias])
-            if best_score >= 88 and len(best_keys) == 1:
+            if best_score >= threshold and len(best_keys) == 1:
                 found.setdefault(next(iter(best_keys)), phrase)
                 occupied.update(span)
 
@@ -82,11 +87,21 @@ def match_additives(extracted_text, index):
 
 
 class ScanService:
-    @cached_property
+    def __init__(self):
+        self._reader = None
+        self._reader_lock = threading.Lock()
+
+    @property
     def reader(self):
-        # EasyOCR pulls in torch and downloads its models on first construction.
-        import easyocr
-        return easyocr.Reader(['en'], gpu=False)
+        # EasyOCR pulls in torch and downloads its models on first construction,
+        # so defer it until the first scan instead of paying for it on import.
+        # The lock keeps concurrent first requests from building two readers.
+        if self._reader is None:
+            with self._reader_lock:
+                if self._reader is None:
+                    import easyocr
+                    self._reader = easyocr.Reader(['en'], gpu=False)
+        return self._reader
 
     def extract_text(self, image_bytes):
         return self.reader.readtext(image_bytes, detail=0)

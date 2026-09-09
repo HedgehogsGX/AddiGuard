@@ -79,6 +79,8 @@ def test_full_taxonomy_matching_does_not_confuse_nearby_chemicals(app):
         ("S0dium benz0ate, asc0rbic acid", {"E211", "E300"}),
         ("msgpack, messages, 250 621", set()),
         ("E101(i)", {"E101(i)"}),
+        ("Carbonated water, sugar, natural flavouring", set()),
+        ("Emulsifier: lecithin", {"E322(i)"}),
     ]
     for label, expected in labels:
         matches = match_additives([label], index)
