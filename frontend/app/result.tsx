@@ -1,202 +1,172 @@
-import React, { useState } from "react";
-import {
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { ScanResult, TrafficLight } from "../types";
-import { useAnalysis } from "../services/analysisContext";
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, Modal, ScrollView, Dimensions } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ApiResponse, ScanResult } from '../types';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
-const colors: Record<TrafficLight, string> = {
-  Red: "#E53935",
-  Yellow: "#FFB300",
-  Green: "#4CAF50",
-};
-const assessedColor = "#607D8B";
-
-function riskColor(result: ScanResult) {
-  return result.traffic_light ? colors[result.traffic_light] : assessedColor;
-}
-
-function riskLabel(result: ScanResult) {
-  return result.traffic_light ? `${result.traffic_light} risk` : "Not assessed";
-}
-
-function display(value: string | number | null) {
-  return value === null ? "Not provided by API" : String(value);
-}
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function ResultScreen() {
+  const params = useLocalSearchParams();
   const router = useRouter();
-  const { result } = useAnalysis();
   const [selectedItem, setSelectedItem] = useState<ScanResult | null>(null);
-  const results = result?.results ?? [];
-
-  if (!result) {
-    return (
-      <SafeAreaView style={styles.emptyPage}>
-        <Ionicons name="scan-outline" size={64} color="#90A4AE" />
-        <Text style={styles.emptyTitle}>No analysis available</Text>
-        <Text style={styles.emptyText}>
-          Capture an ingredient label to see results.
-        </Text>
-        <TouchableOpacity
-          style={styles.rescanButton}
-          onPress={() => router.replace("/")}
-        >
-          <Text style={styles.rescanText}>Scan Again</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
+  
+  let data: ApiResponse | null = null;
+  
+  try {
+    if (params.data) {
+      data = JSON.parse(params.data as string);
+    }
+  } catch (e) {
+    console.error("Failed to parse results", e);
   }
+
+  const results = data?.results || [];
+  const totalRiskScore = results.length > 0 
+    ? Math.max(...results.map(r => r.risk_score)) 
+    : 0;
+
+  const getTrafficColor = (score: number) => {
+    if (score > 0.7) return '#E53935'; // Red
+    if (score >= 0.4) return '#FFB300'; // Yellow
+    return '#4CAF50'; // Green
+  };
+
+  const getTrafficLabel = (score: number) => {
+    if (score > 0.7) return 'HIGH RISK';
+    if (score >= 0.4) return 'MEDIUM RISK';
+    return 'LOW RISK';
+  };
+
+  const overallColor = getTrafficColor(totalRiskScore);
+
+  const renderItem = ({ item }: { item: ScanResult }) => {
+    const isHighRisk = item.risk_score > 0.7;
+    const badgeColor = getTrafficColor(item.risk_score);
+
+    return (
+      <TouchableOpacity 
+        style={styles.card} 
+        onPress={() => setSelectedItem(item)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.badgeContainer, { backgroundColor: badgeColor }]}>
+           <Ionicons 
+            name={isHighRisk ? "warning" : "checkmark-circle"} 
+            size={24} 
+            color="white" 
+          />
+        </View>
+        <View style={styles.cardContent}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.additiveName}>{item.name}</Text>
+            {isHighRisk && <Ionicons name="alert-circle" size={20} color="#E53935" />}
+          </View>
+          <Text style={styles.riskScore}>Risk Level: {item.traffic_light}</Text>
+          <Text style={styles.description} numberOfLines={2}>{item.details.description}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#ccc" style={{ alignSelf: 'center' }} />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.replace("/")}
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Header Summary */}
+        <View style={[styles.header, { backgroundColor: overallColor }]}>
+           <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={24} color="#263238" />
+            <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
+          
           <Text style={styles.headerTitle}>Analysis Report</Text>
-          <Text style={styles.headerSubtitle}>
-            {results.length
-              ? `${results.length} additive${results.length === 1 ? "" : "s"} detected`
-              : "No additives identified"}
-          </Text>
-          <Text style={styles.caveat}>
-            AI-generated from the vision provider. Not medical advice.
-          </Text>
+          
+          <View style={styles.scoreContainer}>
+            <Text style={styles.headerScore}>{totalRiskScore.toFixed(2)}</Text>
+            <Text style={styles.headerScoreLabel}>/ 1.0</Text>
+          </View>
+          <Text style={styles.headerLabel}>{getTrafficLabel(totalRiskScore)}</Text>
         </View>
+
         <View style={styles.listContainer}>
+          <Text style={styles.listTitle}>Detected Additives ({results.length})</Text>
           {results.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons
-                name="checkmark-circle-outline"
-                size={64}
-                color="#90A4AE"
-              />
-              <Text style={styles.emptyTitle}>No additives detected</Text>
-              <Text style={styles.emptyText}>
-                This is not a safety assessment.
-              </Text>
+              <Ionicons name="scan-outline" size={64} color="#ccc" />
+              <Text style={styles.emptyText}>No additives detected.</Text>
+              <TouchableOpacity style={styles.rescanButton} onPress={() => router.back()}>
+                <Text style={styles.rescanText}>Scan Again</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <FlatList
               data={results}
+              renderItem={renderItem}
               keyExtractor={(item, index) => `${item.name}-${index}`}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.card}
-                  onPress={() => setSelectedItem(item)}
-                >
-                  <View
-                    style={[
-                      styles.badgeContainer,
-                      { backgroundColor: riskColor(item) },
-                    ]}
-                  >
-                    <Ionicons
-                      name={
-                        item.traffic_light === "Red"
-                          ? "warning"
-                          : "information-circle"
-                      }
-                      size={24}
-                      color="white"
-                    />
-                  </View>
-                  <View style={styles.cardContent}>
-                    <Text style={styles.additiveName}>{item.name}</Text>
-                    <Text
-                      style={[styles.riskScore, { color: riskColor(item) }]}
-                    >
-                      {riskLabel(item)}
-                      {item.risk_score === null
-                        ? ""
-                        : ` · ${item.risk_score.toFixed(2)}`}
-                    </Text>
-                    <Text style={styles.description} numberOfLines={2}>
-                      {display(item.details.description)}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color="#90A4AE" />
-                </TouchableOpacity>
-              )}
               contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
             />
           )}
         </View>
       </SafeAreaView>
+
+      {/* Detail Modal (Bottom Sheet Style) */}
       <Modal
         visible={selectedItem !== null}
         animationType="slide"
-        transparent
+        transparent={true}
         onRequestClose={() => setSelectedItem(null)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setSelectedItem(null)}
-            >
-              <Ionicons name="close-circle" size={30} color="#90A4AE" />
-            </TouchableOpacity>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHandle} />
+              <TouchableOpacity 
+                style={styles.closeButton} 
+                onPress={() => setSelectedItem(null)}
+              >
+                <Ionicons name="close-circle" size={30} color="#ddd" />
+              </TouchableOpacity>
+            </View>
+            
             {selectedItem && (
               <ScrollView contentContainerStyle={styles.modalScroll}>
                 <Text style={styles.modalTitle}>{selectedItem.name}</Text>
-                <View
-                  style={[
-                    styles.riskBadge,
-                    { backgroundColor: riskColor(selectedItem) },
-                  ]}
-                >
-                  <Text style={styles.riskBadgeText}>
-                    {riskLabel(selectedItem)}
-                  </Text>
+                
+                <View style={[styles.riskBadge, { backgroundColor: getTrafficColor(selectedItem.risk_score) }]}>
+                  <Text style={styles.riskBadgeText}>{selectedItem.traffic_light} Risk</Text>
                 </View>
-                <Detail
-                  title="Description"
-                  value={selectedItem.details.description}
-                />
-                <Detail
-                  title="Health impact"
-                  value={selectedItem.details.health_risk}
-                />
-                <Detail
-                  title="Usage limits"
-                  value={selectedItem.details.usage_limit}
-                />
-                <Text style={styles.sectionTitle}>Risk factors</Text>
-                <Factor
-                  label="Toxicity"
-                  value={selectedItem.details.toxicity_level}
-                />
-                <Factor
-                  label="Exposure"
-                  value={selectedItem.details.exposure_level}
-                />
-                <Factor
-                  label="Sensitivity"
-                  value={selectedItem.details.sensitivity_level}
-                />
-                <Factor
-                  label="Cumulative"
-                  value={selectedItem.details.cumulative_level}
-                />
-                <Text style={styles.caveat}>
-                  These details are AI-generated from the vision provider and
-                  may be incomplete or wrong. They are not medical advice.
-                </Text>
+
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Description</Text>
+                  <Text style={styles.sectionText}>{selectedItem.details.description}</Text>
+                </View>
+
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>⚠️ Health Impact</Text>
+                  <Text style={styles.sectionText}>{selectedItem.details.health_risk || 'No significant health risks reported.'}</Text>
+                </View>
+
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>⚖️ Usage Limits</Text>
+                  <Text style={styles.sectionText}>{selectedItem.details.usage_limit || 'No specific limits.'}</Text>
+                </View>
+
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Risk Factors</Text>
+                  <View style={styles.factorRow}>
+                    <Text style={styles.factorLabel}>Toxicity:</Text>
+                    <Text style={styles.factorValue}>{selectedItem.details.toxicity_level}/10</Text>
+                  </View>
+                  <View style={styles.factorRow}>
+                    <Text style={styles.factorLabel}>Exposure:</Text>
+                    <Text style={styles.factorValue}>{selectedItem.details.exposure_level}/10</Text>
+                  </View>
+                </View>
               </ScrollView>
             )}
           </View>
@@ -206,148 +176,227 @@ export default function ResultScreen() {
   );
 }
 
-function Detail({ title, value }: { title: string; value: string | null }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.sectionText}>{display(value)}</Text>
-    </View>
-  );
-}
-
-function Factor({ label, value }: { label: string; value: number | null }) {
-  return (
-    <View style={styles.factorRow}>
-      <Text style={styles.factorLabel}>{label}</Text>
-      <Text style={styles.factorValue}>
-        {value === null ? "Not provided by API" : `${value}/10`}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F2F4F8" },
-  safeArea: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: '#F2F4F8',
+  },
+  safeArea: {
+    flex: 1,
+  },
   header: {
     padding: 24,
-    alignItems: "center",
-    backgroundColor: "#E8F5E9",
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    alignItems: 'center',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
-  backButton: { position: "absolute", top: 20, left: 20, padding: 8 },
-  headerTitle: { color: "#263238", fontSize: 24, fontWeight: "700" },
-  headerSubtitle: { color: "#546E7A", marginTop: 8 },
-  caveat: {
-    color: "#78909C",
-    fontSize: 12,
-    textAlign: "center",
+  backButton: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    padding: 8,
+  },
+  headerTitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  scoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
     marginTop: 10,
   },
-  listContainer: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
-  listContent: { paddingBottom: 40 },
+  headerScore: {
+    color: 'white',
+    fontSize: 56,
+    fontWeight: '800',
+  },
+  headerScoreLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 20,
+    marginLeft: 4,
+  },
+  headerLabel: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 4,
+    letterSpacing: 0.5,
+  },
+  listContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  listTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 16,
+  },
+  listContent: {
+    paddingBottom: 40,
+  },
   card: {
-    backgroundColor: "white",
-    borderRadius: 14,
-    marginBottom: 14,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginBottom: 16,
     padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    elevation: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   badgeContainer: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
-  cardContent: { flex: 1, marginRight: 8 },
+  cardContent: {
+    flex: 1,
+    marginRight: 8,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   additiveName: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#263238",
-    marginBottom: 5,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    flex: 1,
   },
   riskScore: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 4,
+  },
+  description: {
     fontSize: 13,
-    fontWeight: "700",
-    textTransform: "capitalize",
-    marginBottom: 5,
+    color: '#888',
+    lineHeight: 18,
   },
-  description: { color: "#546E7A", fontSize: 14 },
-  emptyPage: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    backgroundColor: "#F2F4F8",
+  emptyState: {
+    alignItems: 'center',
+    marginTop: 60,
   },
-  emptyState: { alignItems: "center", justifyContent: "center", padding: 28 },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#37474F",
-    marginTop: 14,
-    textAlign: "center",
+  emptyText: {
+    fontSize: 16,
+    color: '#888',
+    marginTop: 16,
+    marginBottom: 24,
   },
-  emptyText: { color: "#607D8B", textAlign: "center", marginTop: 8 },
   rescanButton: {
-    marginTop: 22,
-    backgroundColor: "#4CAF50",
-    borderRadius: 22,
-    paddingVertical: 12,
-    paddingHorizontal: 26,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 24,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  rescanText: { color: "#fff", fontWeight: "700" },
+  rescanText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  // Modal Styles
   modalOverlay: {
     flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    maxHeight: "85%",
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    height: SCREEN_HEIGHT * 0.75,
+    padding: 24,
   },
-  closeButton: { alignSelf: "flex-end", padding: 14 },
-  modalScroll: { padding: 22, paddingTop: 0 },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 3,
+    marginBottom: 10,
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  modalScroll: {
+    paddingBottom: 40,
+  },
   modalTitle: {
-    fontSize: 27,
-    color: "#263238",
-    fontWeight: "700",
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1A1A1A',
     marginBottom: 12,
   },
   riskBadge: {
-    alignSelf: "flex-start",
-    borderRadius: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginBottom: 20,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 24,
   },
   riskBadgeText: {
-    color: "#fff",
-    fontWeight: "700",
-    textTransform: "capitalize",
+    color: 'white',
+    fontWeight: '700',
+    fontSize: 14,
   },
-  section: { marginBottom: 18 },
+  section: {
+    marginBottom: 24,
+  },
   sectionTitle: {
-    color: "#37474F",
-    fontWeight: "700",
     fontSize: 16,
-    marginBottom: 6,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 8,
   },
-  sectionText: { color: "#546E7A", lineHeight: 21 },
+  sectionText: {
+    fontSize: 15,
+    color: '#555',
+    lineHeight: 24,
+  },
   factorRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#ECEFF1",
-    paddingVertical: 9,
+    borderBottomColor: '#F0F0F0',
+    paddingBottom: 8,
   },
-  factorLabel: { color: "#607D8B" },
-  factorValue: { color: "#37474F", fontWeight: "600" },
+  factorLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  factorValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
 });

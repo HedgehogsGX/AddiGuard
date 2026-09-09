@@ -1,25 +1,25 @@
-export type TrafficLight = "Red" | "Yellow" | "Green";
-
-export interface AdditiveDetails {
+export interface Additive {
+  id: number;
   name: string;
-  description: string | null;
-  health_risk: string | null;
-  usage_limit: string | null;
-  toxicity_level: number | null;
-  exposure_level: number | null;
-  sensitivity_level: number | null;
-  cumulative_level: number | null;
+  description: string;
+  toxicity_level: number;
+  exposure_level: number;
+  sensitivity_level: number;
+  cumulative_level: number;
+  health_risk: string;
+  usage_limit: string;
 }
 
 export interface ScanResult {
   name: string;
-  risk_score: number | null;
-  traffic_light: TrafficLight | null;
-  details: AdditiveDetails;
+  risk_score: number;
+  traffic_light: 'Red' | 'Yellow' | 'Green';
+  details: Additive;
 }
 
 export interface ApiResponse {
-  status: "success";
+  status: string;
   additives_found: number;
   results: ScanResult[];
+  error?: string;
 }
