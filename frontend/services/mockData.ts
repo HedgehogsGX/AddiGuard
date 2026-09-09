@@ -3,6 +3,8 @@ import { ApiResponse } from '../types';
 export const MOCK_SCAN_RESULT: ApiResponse = {
   status: 'success',
   additives_found: 3,
+  overall_risk_score: 0.95,
+  overall_traffic_light: 'Red',
   results: [
     {
       name: 'Sodium Nitrite',

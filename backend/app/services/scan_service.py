@@ -1,36 +1,31 @@
-import easyocr
-import numpy as np
-from thefuzz import process
+from functools import cached_property
+
+from thefuzz import fuzz
+
 from app.models import Additive
 
+
 class ScanService:
-    def __init__(self):
-        # Initialize EasyOCR reader (load once)
-        # For production, consider moving this to app startup or lazy loading
-        self.reader = easyocr.Reader(['en'], gpu=False)
+    @cached_property
+    def reader(self):
+        # EasyOCR pulls in torch and downloads its models on first construction,
+        # so defer it until the first scan instead of paying for it on import.
+        import easyocr
+        return easyocr.Reader(['en'], gpu=False)
 
     def extract_text(self, image_bytes):
         """
         Extract text from image bytes using EasyOCR.
         """
-        try:
-            result = self.reader.readtext(image_bytes, detail=0)
-            return result
-        except Exception as e:
-            print(f"OCR Error: {e}")
-            return []
+        return self.reader.readtext(image_bytes, detail=0)
 
     def calculate_risk_score(self, additive):
         """
         Risk Formula:
         total_risk = (toxicity_score * 0.4) + (exposure_risk * 0.3) + (sensitivity * 0.2) + (cumulative_effect * 0.1)
-        
-        Input levels are 1-10. We normalize to 0.1-1.0 for the formula if needed, 
-        OR we calculate on 1-10 scale and divide by 10 to get 0-1 range.
-        
-        Let's calculate on 1-10 scale first.
+
+        Input levels are 1-10, normalized to 0.1-1.0 so the result lands in the 0-1 range.
         """
-        # Normalize 1-10 to 0.1-1.0
         t = additive.toxicity_level / 10.0
         e = additive.exposure_level / 10.0
         s = additive.sensitivity_level / 10.0
@@ -59,42 +54,32 @@ class ScanService:
         3. Calculate Risk
         """
         extracted_text = self.extract_text(image_bytes)
-        
+
         # Get all additives from DB (optimize by caching or specific query later)
         # For MVP, fetching all names is fine if list is small.
         if additives_cache is None:
             all_additives = Additive.query.all()
         else:
             all_additives = additives_cache
-            
-        additive_names = [a.name for a in all_additives]
-        
+
         found_additives = []
-        
-        # Simple text matching (can be improved)
-        # We iterate over extracted words and try to find fuzzy match in DB
-        # Alternatively, iterate over DB additives and check if they exist in text
-        
+
         # Strategy: Iterate through DB names and check if they appear in the extracted text (fuzzy)
-        # Combine extracted text into one string for easier searching? 
-        # Or match line by line.
-        
         full_text = " ".join(extracted_text).lower()
-        
+
         for additive in all_additives:
-            # Fuzzy match score
             # partial_ratio matches substring
-            match_score = process.extractOne(additive.name.lower(), [full_text], scorer=process.fuzz.partial_ratio)
-            
-            if match_score and match_score[1] > 85: # Threshold for match
+            match_score = fuzz.partial_ratio(additive.name.lower(), full_text)
+
+            if match_score > 85: # Threshold for match
                 risk_score = self.calculate_risk_score(additive)
                 traffic_light = self.determine_traffic_light(risk_score)
-                
+
                 found_additives.append({
                     "name": additive.name,
                     "risk_score": risk_score,
                     "traffic_light": traffic_light,
                     "details": additive.to_dict()
                 })
-                
+
         return found_additives

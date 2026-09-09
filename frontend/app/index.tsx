@@ -4,6 +4,7 @@ import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { analyzeImage } from '../services/api';
 import { MOCK_SCAN_RESULT } from '../services/mockData';
+import { ApiResponse } from '../types';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function CameraScreen() {
@@ -38,43 +39,24 @@ export default function CameraScreen() {
     setScanning(true);
 
     try {
+      let result: ApiResponse;
       if (isMockMode) {
-        // Simulate network delay
-        setTimeout(() => {
-          setScanning(false);
-          router.push({
-            pathname: '/result',
-            params: { data: JSON.stringify(MOCK_SCAN_RESULT) }
-          });
-        }, 1500);
-        return;
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        result = MOCK_SCAN_RESULT;
+      } else {
+        const photo = await cameraRef.current?.takePictureAsync({ quality: 0.7 });
+        if (!photo?.uri) throw new Error('Could not capture a photo.');
+        result = await analyzeImage(photo.uri);
       }
 
-      if (cameraRef.current) {
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.7,
-          base64: false,
-        });
-
-        if (photo?.uri) {
-          console.log('Photo taken:', photo.uri);
-          const result = await analyzeImage(photo.uri);
-          
-          if (result.status === 'success') {
-            router.push({
-              pathname: '/result',
-              params: { data: JSON.stringify(result) }
-            });
-          } else {
-            Alert.alert('Scan Failed', result.error || 'Unknown error');
-          }
-        }
-      }
+      router.push({
+        pathname: '/result',
+        params: { data: JSON.stringify(result) }
+      });
     } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'Failed to capture or analyze image.');
+      Alert.alert('Scan Failed', error instanceof Error ? error.message : 'Failed to capture or analyze image.');
     } finally {
-      if (!isMockMode) setScanning(false);
+      setScanning(false);
     }
   };
 
@@ -86,18 +68,19 @@ export default function CameraScreen() {
         ref={cameraRef}
       >
         <SafeAreaView style={styles.overlayContainer}>
-          {/* Header Actions */}
-          <View style={styles.headerControls}>
-            <View style={styles.mockToggleContainer}>
-              <Text style={styles.mockLabel}>Mock Mode</Text>
-              <Switch
-                value={isMockMode}
-                onValueChange={setIsMockMode}
-                trackColor={{ false: "#767577", true: "#81b0ff" }}
-                thumbColor={isMockMode ? "#f5dd4b" : "#f4f3f4"}
-              />
+          {__DEV__ && (
+            <View style={styles.headerControls}>
+              <View style={styles.mockToggleContainer}>
+                <Text style={styles.mockLabel}>Mock Mode</Text>
+                <Switch
+                  value={isMockMode}
+                  onValueChange={setIsMockMode}
+                  trackColor={{ false: "#767577", true: "#81b0ff" }}
+                  thumbColor={isMockMode ? "#f5dd4b" : "#f4f3f4"}
+                />
+              </View>
             </View>
-          </View>
+          )}
 
           <View style={styles.overlayMiddle}>
             <View style={styles.overlaySide} />

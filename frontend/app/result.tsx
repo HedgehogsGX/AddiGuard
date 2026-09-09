@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, FlatList, TouchableOpacity, Modal, ScrollView, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ApiResponse, ScanResult } from '../types';
+import { ApiResponse, ScanResult, TrafficLight } from '../types';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const TRAFFIC_LIGHT: Record<TrafficLight, { color: string; label: string }> = {
+  Red: { color: '#E53935', label: 'HIGH RISK' },
+  Yellow: { color: '#FFB300', label: 'MEDIUM RISK' },
+  Green: { color: '#4CAF50', label: 'LOW RISK' },
+};
 
 export default function ResultScreen() {
   const params = useLocalSearchParams();
@@ -23,27 +29,11 @@ export default function ResultScreen() {
   }
 
   const results = data?.results || [];
-  const totalRiskScore = results.length > 0 
-    ? Math.max(...results.map(r => r.risk_score)) 
-    : 0;
-
-  const getTrafficColor = (score: number) => {
-    if (score > 0.7) return '#E53935'; // Red
-    if (score >= 0.4) return '#FFB300'; // Yellow
-    return '#4CAF50'; // Green
-  };
-
-  const getTrafficLabel = (score: number) => {
-    if (score > 0.7) return 'HIGH RISK';
-    if (score >= 0.4) return 'MEDIUM RISK';
-    return 'LOW RISK';
-  };
-
-  const overallColor = getTrafficColor(totalRiskScore);
+  const totalRiskScore = data?.overall_risk_score ?? 0;
+  const overall = TRAFFIC_LIGHT[data?.overall_traffic_light ?? 'Green'];
 
   const renderItem = ({ item }: { item: ScanResult }) => {
-    const isHighRisk = item.risk_score > 0.7;
-    const badgeColor = getTrafficColor(item.risk_score);
+    const isHighRisk = item.traffic_light === 'Red';
 
     return (
       <TouchableOpacity 
@@ -51,7 +41,7 @@ export default function ResultScreen() {
         onPress={() => setSelectedItem(item)}
         activeOpacity={0.7}
       >
-        <View style={[styles.badgeContainer, { backgroundColor: badgeColor }]}>
+        <View style={[styles.badgeContainer, { backgroundColor: TRAFFIC_LIGHT[item.traffic_light].color }]}>
            <Ionicons 
             name={isHighRisk ? "warning" : "checkmark-circle"} 
             size={24} 
@@ -75,7 +65,7 @@ export default function ResultScreen() {
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header Summary */}
-        <View style={[styles.header, { backgroundColor: overallColor }]}>
+        <View style={[styles.header, { backgroundColor: overall.color }]}>
            <TouchableOpacity 
             style={styles.backButton} 
             onPress={() => router.back()}
@@ -89,7 +79,7 @@ export default function ResultScreen() {
             <Text style={styles.headerScore}>{totalRiskScore.toFixed(2)}</Text>
             <Text style={styles.headerScoreLabel}>/ 1.0</Text>
           </View>
-          <Text style={styles.headerLabel}>{getTrafficLabel(totalRiskScore)}</Text>
+          <Text style={styles.headerLabel}>{overall.label}</Text>
         </View>
 
         <View style={styles.listContainer}>
@@ -137,7 +127,7 @@ export default function ResultScreen() {
               <ScrollView contentContainerStyle={styles.modalScroll}>
                 <Text style={styles.modalTitle}>{selectedItem.name}</Text>
                 
-                <View style={[styles.riskBadge, { backgroundColor: getTrafficColor(selectedItem.risk_score) }]}>
+                <View style={[styles.riskBadge, { backgroundColor: TRAFFIC_LIGHT[selectedItem.traffic_light].color }]}>
                   <Text style={styles.riskBadgeText}>{selectedItem.traffic_light} Risk</Text>
                 </View>
 
@@ -165,6 +155,14 @@ export default function ResultScreen() {
                   <View style={styles.factorRow}>
                     <Text style={styles.factorLabel}>Exposure:</Text>
                     <Text style={styles.factorValue}>{selectedItem.details.exposure_level}/10</Text>
+                  </View>
+                  <View style={styles.factorRow}>
+                    <Text style={styles.factorLabel}>Sensitivity:</Text>
+                    <Text style={styles.factorValue}>{selectedItem.details.sensitivity_level}/10</Text>
+                  </View>
+                  <View style={styles.factorRow}>
+                    <Text style={styles.factorLabel}>Cumulative effect:</Text>
+                    <Text style={styles.factorValue}>{selectedItem.details.cumulative_level}/10</Text>
                   </View>
                 </View>
               </ScrollView>

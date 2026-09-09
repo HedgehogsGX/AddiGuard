@@ -1,3 +1,5 @@
+export type TrafficLight = 'Red' | 'Yellow' | 'Green';
+
 export interface Additive {
   id: number;
   name: string;
@@ -13,13 +15,14 @@ export interface Additive {
 export interface ScanResult {
   name: string;
   risk_score: number;
-  traffic_light: 'Red' | 'Yellow' | 'Green';
+  traffic_light: TrafficLight;
   details: Additive;
 }
 
 export interface ApiResponse {
   status: string;
   additives_found: number;
+  overall_risk_score: number;
+  overall_traffic_light: TrafficLight;
   results: ScanResult[];
-  error?: string;
 }
