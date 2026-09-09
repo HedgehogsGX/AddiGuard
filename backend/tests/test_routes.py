@@ -1,3 +1,5 @@
+import struct
+import zlib
 from io import BytesIO
 
 from app import routes
@@ -21,6 +23,28 @@ def test_scan_with_empty_filename_returns_400(client):
 
 def test_scan_rejects_non_image_payload(client):
     response = post_scan(client, b"this is not an image")
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "Uploaded file is not a valid image"}
+
+
+def test_scan_rejects_corrupt_png_with_400(client, png_bytes):
+    corrupt = png_bytes[:-12] + b"\x00" * 12
+    response = post_scan(client, corrupt)
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "Uploaded file is not a valid image"}
+
+
+def test_scan_rejects_decompression_bomb_with_400(client):
+    def chunk(kind, payload):
+        return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload))
+
+    bomb = (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 60000, 60000, 8, 0, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"\x00"))
+        + chunk(b"IEND", b"")
+    )
+    response = post_scan(client, bomb)
     assert response.status_code == 400
     assert response.get_json() == {"error": "Uploaded file is not a valid image"}
 

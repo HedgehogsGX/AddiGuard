@@ -1,17 +1,26 @@
-from functools import cached_property
+import threading
 
-from thefuzz import fuzz
+from thefuzz import fuzz, utils
 
 from app.models import Additive
 
 
 class ScanService:
-    @cached_property
+    def __init__(self):
+        self._reader = None
+        self._reader_lock = threading.Lock()
+
+    @property
     def reader(self):
         # EasyOCR pulls in torch and downloads its models on first construction,
         # so defer it until the first scan instead of paying for it on import.
-        import easyocr
-        return easyocr.Reader(['en'], gpu=False)
+        # The lock keeps concurrent first requests from building two readers.
+        if self._reader is None:
+            with self._reader_lock:
+                if self._reader is None:
+                    import easyocr
+                    self._reader = easyocr.Reader(['en'], gpu=False)
+        return self._reader
 
     def extract_text(self, image_bytes):
         """
@@ -64,12 +73,13 @@ class ScanService:
 
         found_additives = []
 
-        # Strategy: Iterate through DB names and check if they appear in the extracted text (fuzzy)
-        full_text = " ".join(extracted_text).lower()
+        # Strategy: Iterate through DB names and check if they appear in the extracted text (fuzzy).
+        # full_process lowercases and turns punctuation into spaces so "vitamin-c" still matches "Vitamin C".
+        full_text = utils.full_process(" ".join(extracted_text))
 
         for additive in all_additives:
             # partial_ratio matches substring
-            match_score = fuzz.partial_ratio(additive.name.lower(), full_text)
+            match_score = fuzz.partial_ratio(utils.full_process(additive.name), full_text)
 
             if match_score > 85: # Threshold for match
                 risk_score = self.calculate_risk_score(additive)
