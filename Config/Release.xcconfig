@@ -1,0 +1,2 @@
+// Production credentials must be supplied by a backend proxy, never the app bundle.
+OPENROUTER_API_KEY =

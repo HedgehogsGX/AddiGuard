@@ -1,108 +1,63 @@
-# AddiGuard
+# AddiGuard for iOS
 
-Point your phone at an ingredients label and AddiGuard tells you which food additives it found and how risky they are.
+AddiGuard（添加剂卫士）是一款原生 SwiftUI 应用：拍摄或导入食品配料表，始终通过设备上的 Apple Vision 提取文字，再选择本地知识库或 OpenRouter 上的 GLM-5.3 Flash 对配料进行分析。
 
-The Expo app crops a photo to the on-screen ingredients frame and posts it to a Flask API. The API runs OCR on the image (EasyOCR), matches E-numbers, names and aliases against a database of additives, and returns a Red / Yellow / Green rating for curated additives or Unrated when risk information is missing, plus an overall rating for the label.
+## MVP 功能
 
-## Project structure
+- 相机取景、拍照识别与相册导入
+- 锁定屏幕小组件，可一键打开食品配料识别页
+- 两种明确可选的分析方式：本地知识库分析，以及 OpenRouter GLM-5.3 Flash 在线逐项辅助说明
+- 始终在设备端执行的中英文双路 OCR（Vision）：原图与增强图并行识别，并使用本地添加剂名称、别名和 E/INS 编码词表辅助小字识别；图片不会上传
+- 完整配料拆分：分别标出已匹配添加剂、常见普通配料、可能匹配和未匹配文字，不再静默丢弃未知项
+- GB 2760-2024 附录 F（附录 A 索引）的 287 个名称组、本地中英文常用名与经校验的 E/INS 编码匹配
+- 高关注、需核对、较低关注，以及“无法判断”的未评级状态
+- 儿童、孕期、慢病和过敏设置对应的资料核对提示
+- 添加剂详情、参考标准框架和信息核对建议
+- 受文件保护的本地历史记录与搜索；图片与完整 OCR 原文不写入历史文件
+- 模拟器无相机时的一键完整演示流程
 
-- **backend/** – Flask API (`POST /api/scan`), SQLite via Flask-SQLAlchemy, EasyOCR + thefuzz for matching.
-- **frontend/** – Expo (React Native) app with a camera screen and a results screen.
+## 在线 API 接入状态
 
-## Backend
+- 图片始终只在设备上由 Apple Vision 提取文字。应用先在本地拆分配料，再按所选方式分析；OpenRouter 不参与 OCR，也不会收到图片。
+- 本地解析器生成有界、按原顺序排列的配料数组。在线模式只发送每项的不透明序号和配料名称，不发送完整 OCR、产品名、地址、电话、用户画像、扫描历史或本地知识库；若没有拆出配料，会直接停止在线请求，不会改为上传全文。
+- 本地分析是默认模式。启用在线辅助分析必须基于当前数据边界重新确认，不会隐藏上传或静默切换；确认后该偏好持续到用户切回本地模式。
+- 本地 Debug 构建通过 OpenRouter Chat Completions 调用 `z-ai/glm-5.3-flash`（Z.ai GLM-5.3 Flash）。请求采用 HTTPS、Bearer 认证、低强度推理和 `data_collection=deny`；模型只为本地清单中的每一种配料生成辅助说明，不能新增、删除、改名、排序或改写本地风险结论。
+- 模型 slug 会随上游下线而失效：本项目最初使用的 `stealth/ox-alpha` 隐身测试期结束后已被 OpenRouter 移除，改名为 `z-ai/glm-5.3-flash`。此时接口返回 HTTP 404，应用按 `modelUnavailable` 提示改用本地分析，不会崩溃也不会静默上传。升级模型前可先用 `curl` 调用 `https://openrouter.ai/api/v1/models` 或直接发一次最小请求确认 slug 仍然有效。
+- 本地凭证只放在被 Git 忽略的 `Config/Secrets.xcconfig`，不会写入源码、测试、README、Info.plist 或 App 包。`Config/Debug.xcconfig` 会可选加载它，Debug scheme 在启动时传入并保存至版本化的本机 Keychain 槽位；若启动变量存在但为空或未展开，应用会直接判定 API 未配置，不会静默回退到旧凭证。`Config/Release.xcconfig` 始终为空，Release 代码也不会读取开发凭证，因此 Archive/TestFlight/App Store 构建不会携带它。
+- 新环境可复制 `Config/Secrets.xcconfig.example` 为 `Config/Secrets.xcconfig` 并填写仅用于开发、带额度限制的密钥，然后运行 `xcodegen generate` 并从 Xcode 执行一次 Run。没有本地凭证或 Keychain 记录时，在线选项显示“待配置”且不会发起网络请求。
+- Debug 日志只记录凭证来源、不可逆短指纹、请求返回的 generation ID、模型、结束原因、token 数与成本，不记录 API key、Authorization、图片、完整 OCR 或配料名称。排查免费模型时应以 HTTP 200、`finish_reason=stop`、token 数和 generation 记录为准；费用为 0 本身不代表请求失败。
+- 客户端在运行时使用的任何密钥仍可能从受控设备或进程中提取。正式发布应改为调用自有后端代理；若改为用户自带密钥，应提供应用内录入、Keychain 保存与删除能力。
+- `data_collection=deny` 只用于排除明确声明收集数据的上游，不构成零留存保证。OpenRouter、模型提供方 Z.ai，以及 OpenRouter 实际路由到的第三方推理服务商，仍可能依服务条款长期处理、保留并使用提示、回复及请求元数据，包括服务或模型改进许可；提供方、处理地区和政策也可能变化。发布前需重新核对服务政策、重新取得适当同意，并更新 App Store 隐私披露。
 
-Requires Python 3.12.
+## 运行
 
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt     # CPU-only torch; ~1 GB
-python seed.py                      # (re)creates the SQLite DB with sample additives
-python import_additives.py          # upserts the bundled Open Food Facts taxonomy, offline
-FLASK_DEBUG=1 python run.py         # serves on http://0.0.0.0:5000
-```
+1. 安装 Xcode 16 或更高版本（项目最低支持 iOS 17）。
+2. 如需重新生成工程，运行 `xcodegen generate`。
+3. 打开 `AddiGuard.xcodeproj`，选择 `AddiGuard` scheme 和任意 iPhone 模拟器。
+4. 点击 Run。模拟器中可点击“示例匹配”体验完整流程；真机可直接拍照。
 
-The OCR models (~100 MB) are downloaded on the first `/api/scan` request, so expect that call to be slow once.
+## 添加锁定屏幕小组件
 
-The additive schema includes a unique, nullable `e_number` (for example `E250`, `E150a` or `E101(i)`) and a JSON list of lowercase aliases. `seed.py` destructively rebuilds the database, so run it to adopt the new schema on an existing development database; there is no migration system yet. Back up any data you need first. The importer can then be run repeatedly without duplicating additives. It preserves the five seeded additives' existing factors and does not assign risk factors to newly imported entries. The bundled snapshot imports 643 concrete E-number entries, of which 638 are Unrated after seeding. Generic taxonomy categories and wildcard codes are excluded.
+1. 在设备上安装并打开 AddiGuard 一次。
+2. 长按锁定屏幕，依次选择“自定”“锁定屏幕”和“添加小组件”。
+3. 在小组件列表中选择 AddiGuard，并添加行内、圆形或矩形样式。
+4. 点击小组件即可打开 AddiGuard 的食品配料识别页。
 
-The unmodified Open Food Facts snapshot and its source, checksum and licensing information are in `backend/data/`; importing and testing do not require network access. To use an updated raw taxonomy, run `python import_additives.py /path/to/additives.txt`. The importer invalidates the current process's alias index; restart other running API processes after import, particularly when updating existing aliases without adding rows.
+## 架构
 
-Configuration is via environment variables:
+- `Sources/App`：应用入口与 Tab/NavigationStack 外壳
+- `Sources/Features`：扫描、结果、历史和用户档案
+- `Sources/Services`：相机、本地 OCR、本地/API 分析路由、知识库与持久化
+- `Sources/Models`：添加剂、扫描结果和用户画像模型
+- `WidgetExtension`：锁定屏幕小组件与扫描页深链入口
+- `SupportingFiles`：主 App 与 Widget Extension 的 Info.plist
+- `Tests`：名称匹配、目录一致性和不确定状态测试
 
-| Variable       | Default                  | Purpose                                  |
-| -------------- | ------------------------ | ---------------------------------------- |
-| `DATABASE_URL` | `sqlite:///addiguard.db` | SQLAlchemy connection string             |
-| `FLASK_DEBUG`  | unset                    | Set to `1` for the debugger and reloader |
-| `PORT`         | `5000`                   | Port for `python run.py`                 |
+## 识别范围
 
-Uploads are capped at 10 MB and must decode as an image.
+- 扩展目录覆盖 GB 2760-2024 附录 F 中的 287 个食品添加剂名称组；对可唯一映射的单一 INS 编码生成 `E`、`E 号`、`INS` 和 `INS 号`写法。多成分、多编号组不会猜测编号归属。
+- 匹配器会处理大小写、全角字符、空格、换行、连字符和常见标点差异，并优先匹配较长的具体名称，避免把“柠檬酸钠”重复识别为“柠檬酸”。
+- 配料解析器支持中英文标题、中文标点、括号内添加剂组和多行标签；少量经审查的整词 OCR 错误可自动纠正，其余单字模糊结果只显示为“可能匹配”，不会进入风险结果。
+- 食品用香精、食品用香料、加工助剂、酶制剂、营养强化剂和复配食品添加剂可按类别识别；其未展开的具体组成需要结合产品资料核对。
 
-### Tests
-
-```bash
-pip install -r requirements-dev.txt
-pytest
-```
-
-## Frontend
-
-```bash
-cd frontend
-npm ci
-npm test                          # pure crop geometry tests, no device required
-npx tsc --noEmit
-npx expo start
-```
-
-The app needs to reach the backend. By default it targets port 5000 on the machine that serves the Expo dev bundle, which works for a physical device on the same Wi‑Fi and for emulators. To point it elsewhere, create `frontend/.env`:
-
-```
-EXPO_PUBLIC_API_URL=http://192.168.1.20:5000/api
-```
-
-In development builds a **Mock Mode** switch on the camera screen returns canned results so the UI can be exercised without a backend.
-
-The camera measures the preview and scan frame, maps the frame through the preview's centered aspect-ratio fill to captured photo pixels, and crops before upload. The cropped image is downscaled to at most 1600 pixels on its long side and encoded as JPEG at quality 0.8. Only the framed region is sent to OCR. Mock Mode bypasses image processing. Scan results live in a React context rather than URL parameters; opening the results route without an in-memory scan redirects to the camera.
-
-## API
-
-`POST /api/scan` with a `multipart/form-data` body containing an `image` file.
-
-```json
-{
-  "status": "success",
-  "additives_found": 1,
-  "overall_risk_score": 0.83,
-  "overall_traffic_light": "Red",
-  "results": [
-    {
-      "name": "Sodium Nitrite",
-      "matched_text": "e250",
-      "risk_score": 0.83,
-      "traffic_light": "Red",
-      "details": { "id": 1, "name": "Sodium Nitrite", "e_number": "E250", "aliases": ["sodium nitrite"], "toxicity_level": 9, "...": "..." }
-    }
-  ]
-}
-```
-
-Errors return `{ "error": "..." }` with a 4xx/5xx status.
-
-Each result includes `matched_text`, the normalized OCR phrase or code that triggered detection. Names and aliases match on phrase boundaries, with conservative fuzzy matching for longer aliases to tolerate OCR mistakes; short aliases such as `MSG` only match exactly. Explicit E-number variants such as `E 250` and `E-250` are recognized, while bare numbers require an additive-class context such as `preservative (250)` or `flavour enhancer (621)`. Multiple hits for the same additive produce one result.
-
-### Risk score
-
-Each additive has four 1–10 factors. The score is a weighted sum normalised to 0–1:
-
-```
-risk = toxicity·0.4 + exposure·0.3 + sensitivity·0.2 + cumulative·0.1
-```
-
-`> 0.7` is Red, `0.4–0.7` is Yellow, `< 0.4` is Green. The overall label rating is the highest-scoring additive found. The backend is the only place these thresholds live; the app just renders the `traffic_light` values it receives.
-
-If any risk factor is null, that additive has `risk_score: null` and `traffic_light: "Unrated"`. Unrated detections are shown with a grey information badge and excluded from the overall score; they are not a claim of safety. If every detection is Unrated, the overall score is null and the overall traffic light is Unrated. An empty result retains `overall_risk_score: 0` and `overall_traffic_light: "Green"` for compatibility; no detection is not proof of a safe label.
-
-## Status
-
-Early MVP. The seed data has five additives with placeholder risk factors and health notes; none of it is medical advice. Open Food Facts expands detection coverage, not the curated risk database. OCR and approximate matching can still miss ingredients or return false positives, and the preview-to-photo mapping still needs validation on physical iOS and Android devices.
+> 扩展目录只用于提高名称识别率。只有少量条目经过单独整理，其余条目标为“无法判断”，不会被默认标成低关注。应用没有食品类别、实际添加量、摄入量、体重或 ADI 数据，因此不能判断产品是否合规或安全，也不能替代完整监管数据库、医生或食品安全专业人员的意见。

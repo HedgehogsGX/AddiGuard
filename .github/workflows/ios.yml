@@ -1,0 +1,66 @@
+name: iOS CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Select an available iPhone Simulator
+        id: simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          simulator_id="$(xcrun simctl list devices available -j | jq -r '[.devices | to_entries[] | .value[] | select(.name | startswith("iPhone"))][0].udid // empty')"
+          test -n "$simulator_id"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Run unit tests
+        run: >-
+          xcodebuild
+          -project AddiGuard.xcodeproj
+          -scheme AddiGuard
+          -configuration Debug
+          -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}'
+          -derivedDataPath "$RUNNER_TEMP/AddiGuardTests"
+          CODE_SIGNING_ALLOWED=NO
+          test
+
+      - name: Build unsigned Release app
+        run: >-
+          xcodebuild
+          -project AddiGuard.xcodeproj
+          -scheme AddiGuard
+          -configuration Release
+          -destination 'generic/platform=iOS'
+          -derivedDataPath "$RUNNER_TEMP/AddiGuardRelease"
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Verify release resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="$RUNNER_TEMP/AddiGuardRelease/Build/Products/Release-iphoneos/AddiGuard.app"
+          test -f "$app_path/Assets.car"
+          test -f "$app_path/PrivacyInfo.xcprivacy"
+          plutil -extract CFBundleIcons xml1 -o /dev/null "$app_path/Info.plist"
+          test "$(plutil -extract NSPrivacyTracking raw -o - "$app_path/PrivacyInfo.xcprivacy")" = "false"
+          test "$(plutil -extract NSPrivacyAccessedAPITypes.0.NSPrivacyAccessedAPIType raw -o - "$app_path/PrivacyInfo.xcprivacy")" = "NSPrivacyAccessedAPICategoryUserDefaults"
+          test "$(plutil -extract NSPrivacyAccessedAPITypes.0.NSPrivacyAccessedAPITypeReasons.0 raw -o - "$app_path/PrivacyInfo.xcprivacy")" = "CA92.1"

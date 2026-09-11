@@ -1,0 +1,122 @@
+name: AddiGuard
+options:
+  bundleIdPrefix: com.addiguard
+  developmentLanguage: zh-Hans
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""
+targets:
+  AddiGuard:
+    type: application
+    platform: iOS
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Release: Config/Release.xcconfig
+    sources:
+      - Sources
+      - path: Resources/Assets.xcassets
+        buildPhase: resources
+      - path: SupportingFiles/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    info:
+      path: SupportingFiles/AddiGuard-Info.plist
+      properties:
+        CFBundleDisplayName: AddiGuard
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: com.addiguard.app
+            CFBundleURLSchemes:
+              - addiguard
+        LSApplicationCategoryType: public.app-category.healthcare-fitness
+        NSCameraUsageDescription: AddiGuard 使用相机拍摄食品配料表，并仅在设备上通过 Apple Vision 提取文字。
+        NSPhotoLibraryUsageDescription: AddiGuard 使用您选择的配料表照片，并仅在设备上通过 Apple Vision 提取文字；图片不会上传。
+        UIApplicationSupportsIndirectInputEvents: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    dependencies:
+      - target: AddiGuardWidgetExtension
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.addiguard.app
+        PRODUCT_NAME: AddiGuard
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1,2"
+  AddiGuardWidgetExtension:
+    type: app-extension
+    platform: iOS
+    scheme:
+      environmentVariables:
+        _XCWidgetFamily: accessoryRectangular
+        _XCWidgetKind: AddiGuardLockScreenWidget
+    sources:
+      - WidgetExtension
+    info:
+      path: SupportingFiles/AddiGuardWidget-Info.plist
+      properties:
+        CFBundleDisplayName: AddiGuard
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        APPLICATION_EXTENSION_API_ONLY: YES
+        GENERATE_INFOPLIST_FILE: NO
+        PRODUCT_BUNDLE_IDENTIFIER: com.addiguard.app.widget
+        PRODUCT_NAME: AddiGuardWidgetExtension
+        SKIP_INSTALL: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+  AddiGuardTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: AddiGuard
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.addiguard.tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  AddiGuard:
+    build:
+      targets:
+        AddiGuard: all
+    run:
+      config: Debug
+      environmentVariables:
+        OPENROUTER_API_KEY: "$(OPENROUTER_API_KEY)"
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - name: AddiGuardTests
+    profile:
+      config: Release
+      environmentVariables:
+        - variable: OPENROUTER_API_KEY
+          value: ""
+          isEnabled: false
+    analyze:
+      config: Debug
+    archive:
+      config: Release

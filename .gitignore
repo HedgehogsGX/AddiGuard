@@ -37,7 +37,25 @@ instance/
 
 # Node (in case any exist at root level)
 node_modules/
-frontend/.test-dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Xcode
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+*.xcresult
+*.xcarchive
+
+# Local API credentials (never ship developer-owned secrets in the app bundle)
+Config/Secrets.xcconfig
+Config/*.local.xcconfig
+.env
+.env.*
+!.env.example
+
+# Trae IDE scratch documents
+.trae/
