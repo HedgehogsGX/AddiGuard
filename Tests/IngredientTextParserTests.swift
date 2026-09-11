@@ -114,6 +114,41 @@ final class IngredientTextParserTests: XCTestCase {
         XCTAssertFalse(tokens.contains { $0.text.contains("净含量") })
     }
 
+    /// Bare numbers that merely sit next to the letter E must not be read as
+    /// E-numbers. A net quantity ("250 克") and a vitamin dose ("维生素E 250mg")
+    /// both contain the digits of E250 (sodium nitrite), so a matcher that
+    /// looked for the number alone, or that substring-matched "E250" anywhere,
+    /// would report a preservative that is not on the label.
+    func testDigitsNextToENumbersAreNotReadAsAdditiveCodes() {
+        let text = "配料：饮用水、维生素E 250mg、白砂糖。净含量：250 克"
+        let tokens = IngredientTextParser.parse(text: text)
+
+        let sodiumNitrite = AdditiveCatalog.all.first { $0.code == "E250" }
+        XCTAssertNotNil(sodiumNitrite, "Catalog should still contain E250.")
+        XCTAssertFalse(
+            tokens.contains { $0.matchedAdditiveID == sodiumNitrite?.id },
+            "A net quantity or vitamin dose must not match E250."
+        )
+        XCTAssertFalse(tokens.contains { $0.text.contains("净含量") })
+    }
+
+    /// The prefixed forms must still match, so the guard above is not simply
+    /// disabling E-number recognition.
+    func testPrefixedENumbersStillMatchTheirAdditive() {
+        let sodiumNitrite = AdditiveCatalog.all.first { $0.code == "E250" }
+        XCTAssertNotNil(sodiumNitrite)
+
+        for spelling in ["E250", "E 250", "INS250"] {
+            let tokens = IngredientTextParser.parse(
+                text: "配料：饮用水、食品添加剂（\(spelling)）"
+            )
+            XCTAssertTrue(
+                tokens.contains { $0.matchedAdditiveID == sodiumNitrite?.id },
+                "\(spelling) should match E250."
+            )
+        }
+    }
+
     func testTokenIDsAreDeterministicAcrossParses() {
         let text = "配料：水、白砂糖、食品添加剂（柠檬酸）"
 

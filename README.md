@@ -36,6 +36,20 @@ AddiGuard（添加剂卫士）是一款原生 SwiftUI 应用：拍摄或导入�
 3. 打开 `AddiGuard.xcodeproj`，选择 `AddiGuard` scheme 和任意 iPhone 模拟器。
 4. 点击 Run。模拟器中可点击“示例匹配”体验完整流程；真机可直接拍照。
 
+## 测试
+
+- 常规测试：`xcodebuild -project AddiGuard.xcodeproj -scheme AddiGuard -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test`。全部用例都不联网。
+- 联网冒烟测试：`Tests/OpenRouterLiveSmokeTests.swift` 会用生产请求体真实调用一次 OpenRouter，用来发现模型 slug 被上游下线这类离线测试查不出的问题。默认跳过，CI 不会执行，也不会消耗额度。
+- 该用例在模拟器进程内运行，不继承终端环境变量，因此必须使用 xcodebuild 的 `TEST_RUNNER_` 前缀（转发时会自动去掉前缀）；不加前缀只会静默跳过：
+
+```
+TEST_RUNNER_ADDIGUARD_LIVE_API_TESTS=1 \
+TEST_RUNNER_OPENROUTER_API_KEY="$(awk -F= '/OPENROUTER_API_KEY/{print $2}' Config/Secrets.xcconfig | tr -d ' ')" \
+xcodebuild -project AddiGuard.xcodeproj -scheme AddiGuard \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -only-testing:AddiGuardTests/OpenRouterLiveSmokeTests test
+```
+
 ## 添加锁定屏幕小组件
 
 1. 在设备上安装并打开 AddiGuard 一次。

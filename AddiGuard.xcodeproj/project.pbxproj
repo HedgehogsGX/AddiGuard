@@ -24,6 +24,7 @@
 		4630AE078A9846ED3798673B /* ProductNameParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2674D3A0723FA8DE3D712ED /* ProductNameParser.swift */; };
 		551715D840ED351FC090B42A /* AddiGuardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 021D479ADEB7185A8521FFA0 /* AddiGuardApp.swift */; };
 		60BA6CFE3FB27C637B8F2CB0 /* ReferenceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D802CD9DDD7A4711354D9AC /* ReferenceDetailView.swift */; };
+		6B2D4E4C73691330891A1A18 /* OpenRouterLiveSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B6409FCF5C96D95C26EFE6 /* OpenRouterLiveSmokeTests.swift */; };
 		760F30CF1222A78AEE59B15E /* PrivacyPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9457EF4B050581874E15B0BD /* PrivacyPolicyView.swift */; };
 		867133B9FE9E7BCE4301DE77 /* OCRServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCDB426A7AE2AF1B38C2B236 /* OCRServiceTests.swift */; };
 		8831D4BABDB8279C465D621F /* ReferenceSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 892B30AF09C77CB5B823FF2B /* ReferenceSourceTests.swift */; };
@@ -112,6 +113,7 @@
 		9AAFFCBADA2244FE50C819A7 /* Additive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Additive.swift; sourceTree = "<group>"; };
 		9F3621AD301C92155E3824AB /* OCRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRService.swift; sourceTree = "<group>"; };
 		A6C63F3F6662117CFB78AA5D /* CuratedSpriteAdditivesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratedSpriteAdditivesTests.swift; sourceTree = "<group>"; };
+		A7B6409FCF5C96D95C26EFE6 /* OpenRouterLiveSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenRouterLiveSmokeTests.swift; sourceTree = "<group>"; };
 		A9C8A7B39A0B2C3A5BC721CA /* RecognitionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionServiceTests.swift; sourceTree = "<group>"; };
 		AC6D660EE10BD2358D95538A /* OpenRouterIngredientAnalysisProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenRouterIngredientAnalysisProviderTests.swift; sourceTree = "<group>"; };
 		AD2846AC86199543377D1153 /* ScanStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanStore.swift; sourceTree = "<group>"; };
@@ -211,6 +213,7 @@
 				DCDB426A7AE2AF1B38C2B236 /* OCRServiceTests.swift */,
 				E5821238597D3191FE995CF8 /* OpenRouterConfigurationTests.swift */,
 				AC6D660EE10BD2358D95538A /* OpenRouterIngredientAnalysisProviderTests.swift */,
+				A7B6409FCF5C96D95C26EFE6 /* OpenRouterLiveSmokeTests.swift */,
 				A9C8A7B39A0B2C3A5BC721CA /* RecognitionServiceTests.swift */,
 				892B30AF09C77CB5B823FF2B /* ReferenceSourceTests.swift */,
 				D45A76C442C90C0FB902E739 /* ScanStorePersistenceTests.swift */,
@@ -482,6 +485,7 @@
 				867133B9FE9E7BCE4301DE77 /* OCRServiceTests.swift in Sources */,
 				34E34F3328FBBF6378A6000B /* OpenRouterConfigurationTests.swift in Sources */,
 				059363A4F1C54849C46E9259 /* OpenRouterIngredientAnalysisProviderTests.swift in Sources */,
+				6B2D4E4C73691330891A1A18 /* OpenRouterLiveSmokeTests.swift in Sources */,
 				D7C7D95FDB65EE201699D629 /* RecognitionServiceTests.swift in Sources */,
 				8831D4BABDB8279C465D621F /* ReferenceSourceTests.swift in Sources */,
 				B3902220B09B617672BEB46C /* ScanStorePersistenceTests.swift in Sources */,
